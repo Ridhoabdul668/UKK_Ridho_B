@@ -33,6 +33,9 @@
         }
     },
     "scripts": {
+    "lint": "pint",
+    "lint:fix": "pint",
+    "lint:check": "pint --test",
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",

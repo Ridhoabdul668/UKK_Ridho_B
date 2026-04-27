@@ -1,103 +1,66 @@
 @extends('layouts.app')
 
-@section('title', 'Request Hapus Produk')
+@section('title', 'Manajemen Request Hapus Transaksi')
 
 @section('content')
 <div class="card">
-    <div class="card-header bg-warning">
-        <h5 class="mb-0">Request Penghapusan/Edit Produk dari Kasir</h5>
+    <div class="card-header bg-black text-white">
+        <h5><i class="fas fa-ticket-alt me-2"></i>Request Hapus Transaksi</h5>
     </div>
     <div class="card-body">
-        @if($requests->count() > 0)
-        <div class="table-responsive">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Tanggal</th>
-                        <th>Diminta Oleh</th>
-                        <th>Tabel Target</th>
-                        <th>ID Target</th>
-                        <th>Alasan</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($requests as $req)
-                    <tr>
-                        <td>{{ $req->created_at->format('d/m/Y H:i') }}</td>
-                        <td>{{ $req->requester->name }}</td>
-                        <td>{{ $req->tabel_target }}</td>
-                        <td>{{ $req->target_id }}</td>
-                        <td>{{ $req->alasan }}</td>
-                        <td>
-                            <div class="btn-group">
-                                <form action="{{ route('delete-requests.approve', $req->id) }}" method="POST" class="d-inline">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Setujui penghapusan?')">
-                                        <i class="fas fa-check"></i> Setujui
-                                    </button>
-                                </form>
-                                <form action="{{ route('delete-requests.reject', $req->id) }}" method="POST" class="d-inline">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tolak request?')">
-                                        <i class="fas fa-times"></i> Tolak
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
+        @if(count($transactionRequests) == 0)
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>Tidak ada request pending untuk transaksi.
+            </div>
         @else
-        <p class="text-muted text-center">Tidak ada request pending</p>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="50">No</th>
+                            <th width="150">Tanggal Request</th>
+                            <th width="150">Kode Transaksi</th>
+                            <th>Petugas</th>
+                            <th>Total Transaksi</th>
+                            <th>Alasan Hapus</th>
+                            <th width="150">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($transactionRequests as $index => $t)
+                        <tr class="{{ $t->status == 'pending' ? 'table-warning' : '' }}">
+                            <td class="text-center">{{ $index + 1 }}</td>
+                            <td>{{ $t->created_at->format('d/m/Y H:i:s') }}</td>
+                            <td>
+                                <strong>{{ $t->transaksi->kode_transaksi ?? '-' }}</strong>
+                            </td>
+                            <td>{{ $t->petugas->name ?? '-' }}</td>
+                            <td>
+                                Rp {{ number_format($t->transaksi->total ?? 0, 0, ',', '.') }}
+                            </td>
+                            <td>{{ $t->alasan_hapus }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <form action="{{ route('delete-requests.transaction.approve', $t->id) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-success" onclick="return confirm('Setujui request hapus ini? Stok produk akan dikembalikan.')">
+                                            <i class="fas fa-check me-1"></i> Approve
+                                        </button>
+                                    </form>
+                                    <form action="{{ route('delete-requests.transaction.reject', $t->id) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-danger" onclick="return confirm('Tolak request hapus ini?')">
+                                            <i class="fas fa-times me-1"></i> Reject
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
         @endif
     </div>
 </div>
-
-<!-- Script untuk kasir buat request (dari halaman produk) -->
-@if(!auth()->user()->isAdmin())
-@push('scripts')
-<script>
-// Ini akan muncul di halaman produk untuk kasir
-$(document).ready(function() {
-    // Tambahkan tombol "Request Hapus" di setiap baris produk (jika kasir login)
-    $('table tbody tr').each(function() {
-        const productId = $(this).find('.btn-danger').closest('form').attr('action')?.split('/').pop();
-        if(productId && !$(this).find('.btn-request').length) {
-            $(this).find('.btn-group').append(`
-                <button type="button" class="btn btn-sm btn-info btn-request" data-id="${productId}">
-                    <i class="fas fa-ticket-alt"></i> Request
-                </button>
-            `);
-        }
-    });
-    
-    $(document).on('click', '.btn-request', function() {
-        const id = $(this).data('id');
-        const alasan = prompt('Alasan ingin menghapus/mengedit produk ini:');
-        if(alasan) {
-            $.ajax({
-                url: '{{ route("delete-request.store") }}',
-                method: 'POST',
-                data: {
-                    tabel_target: 'products',
-                    target_id: id,
-                    alasan: alasan,
-                    _token: '{{ csrf_token() }}'
-                },
-                success: function(response) {
-                    alert('Request sudah dikirim ke admin');
-                },
-                error: function() {
-                    alert('Gagal mengirim request');
-                }
-            });
-        }
-    });
-});
-</script>
-@endpush
-@endif
 @endsection
